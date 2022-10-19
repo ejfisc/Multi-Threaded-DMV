@@ -5,12 +5,16 @@
 #include <string.h>
 #include <sys/types.h>
 #include <semaphore.h>
+#define NUM_CUSTOMERS 20
+
 
 void* print_cust_thread(void*);
 void* print_agent_thread(void*);
 
 int main() {
-
+    int customer = 0;
+    pthread_t threads[NUM_CUSTOMERS] = {0};
+    int blah = 0;
 }
 
 void* print_cust_thread(void* arg) {
