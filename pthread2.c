@@ -57,6 +57,7 @@ int main(int argc,char *argv[])
          fprintf(stderr,"thread %d terminated abnormally\n",worker);
          exit(1);
       }
+      
    }
 
    return(0);
