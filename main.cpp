@@ -9,7 +9,6 @@
 // number of customers and agents
 #define NUM_CUSTOMERS 20
 #define NUM_AGENTS 2
-#define MAX_AGENT_QUEUE 4
 
 // error codes
 #define CUSTOMER_CREATE_ERROR 0
@@ -40,13 +39,27 @@ typedef struct Queue {
     int next;
     int last;
     customer* queue;
+    Queue(int size) {
+        this->size = size;
+        next = 0;
+        last = 0;
+        this->queue = (customer*)
+    }
+    void enqueue(customer cust) {
+        queue[last] = cust;
+        last++;
+    }
+    customer dequeue()
 }queue;
 
-// queues
-queue *info_desk_queue;
-queue *waiting_room_queue;
-queue *agent0_line;
-queue *agent1_line;
+// customer queues
+// customer info_desk_queue[NUM_CUSTOMERS];
+// int info_desk_next = 0;
+// int info_desk_last = 0;
+
+// customer waiting_room_queue[NUM_CUSTOMERS];
+// int waiting_room_next = 0;
+// int waiting_room_last = 0;
 
 // function declarations
 void thread_error(int, int);
@@ -54,21 +67,12 @@ void* customer_thread(void*);
 void* agent_thread(void*);
 void* info_desk_thread(void*);
 void* announcer_thread(void*);
-void enqueue(queue*, customer cust);
-customer dequeue(queue*);
+// void enqueue(customer[], int*, customer);
+// customer dequeue(customer[], int*);
 
 
 // main thread is used for creating and joining the other threads
 int main() {
-    // initialize queues
-    info_desk_queue->size = NUM_CUSTOMERS;
-    info_desk_queue->last = 0;
-    info_desk_queue->next = 0;
-    info_desk_queue->queue = (customer*)malloc(sizeof(customer)*NUM_CUSTOMERS);
-    
-
-
-
     // set up semaphores
     sem_unlink(SEM_MUTEX1_NAME); // remove the semaphore if for some reason it still exists
     mutex1 = sem_open(SEM_MUTEX1_NAME, O_CREAT, 0660, 1); // open the semaphore
@@ -272,16 +276,16 @@ void* announcer_thread(void* arg) {
     return arg;
 }
 
-// enqueues the given customer to the last position in the given queue
-void enqueue(queue *queue, customer cust) {
-    queue->queue[queue->last] = cust;
-    queue->last++;
-}
+// // enqueues the given customer to the last position in the given queue
+// void enqueue(customer queue[], int *last, customer cust) {
+//     queue[*last] = cust;
+//     *last++;
+// }
 
-// dequeues the next customer from the given customer queue
-customer dequeue(queue *queue) {
-    customer ret = queue->queue[queue->next];
-    queue->next++;
-    return ret;
-}
+// // dequeues the next customer from the given customer queue
+// customer dequeue(customer queue[], int *next) {
+//     customer ret = queue[*next];
+//     *next++;
+//     return ret;
+// }
 
