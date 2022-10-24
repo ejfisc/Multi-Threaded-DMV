@@ -66,6 +66,12 @@ int main() {
     info_desk_queue->next = 0;
     info_desk_queue->queue = (customer*)malloc(sizeof(customer)*NUM_CUSTOMERS);
     
+    waiting_room_queue->size = NUM_CUSTOMERS;
+    waiting_room_queue->last = 0;
+    waiting_room_queue->next = 0;
+    waiting_room_queue->queue = (customer*)malloc(sizeof(customer)*NUM_CUSTOMERS);
+
+    agent0_line->size = MAX_AGENT_QUEUE;
 
 
 
