@@ -5,17 +5,20 @@
 #include <string.h>
 #include <sys/types.h>
 #include <semaphore.h>
+
+// number of customers and agents
 #define NUM_CUSTOMERS 20
 #define NUM_AGENTS 2
+
 // error codes
-#define customer_create_error 0
-#define agent_create_error 1
-#define info_desk_create_error 2
-#define announcer_create_error 3
-#define customer_join_error 4
-#define agent_join_error 5
-#define info_desk_join_error 6
-#define announcer_join_error 7
+#define CUSTOMER_CREATE_ERROR 0
+#define AGENT_CREATE_ERROR 1
+#define INFO_DESK_CREATE_ERROR 2
+#define ANNOUNCER_CREATE_ERROR 3
+#define CUSTOMER_JOIN_ERROR 4
+#define AGENT_JOIN_ERROR 5
+#define INFO_DESK_JOIN_ERROR 6
+#define ANNOUNCER_JOIN_ERROR 7
 
 // function declarations
 void errexit(int, int);
@@ -26,6 +29,10 @@ void* announcer_thread(void*);
 
 int debugOutput = 1;
 
+// semaphores
+
+
+// main thread is used for creating and joining the other threads
 int main() {
     int errcode = 0; // holds pthread error code
     int *status = 0; // holds return code
@@ -35,13 +42,13 @@ int main() {
     int info_desk_id = 100; 
     // I just gave the id some arbitrary number unique to this thread
     errcode = pthread_create(&info_desk, NULL, info_desk_thread, &info_desk_id);
-    if(errcode) errexit(info_desk_create_error, info_desk_id);
+    if(errcode) errexit(INFO_DESK_CREATE_ERROR, info_desk_id);
 
     // create announcer thread
     pthread_t announcer = NULL;
     int announcer_id = 101;
     errcode = pthread_create(&announcer, NULL, announcer_thread, &announcer_id);
-    if(errcode) errexit(announcer_create_error, announcer_id);
+    if(errcode) errexit(ANNOUNCER_CREATE_ERROR, announcer_id);
 
     // create agent threads
     pthread_t agent_threads[NUM_AGENTS]; // holds agent thread info
@@ -55,7 +62,7 @@ int main() {
         // create thread
         errcode = pthread_create(&agent_threads[agent], NULL, agent_thread, &agent_ids[agent]);
         if(errcode) {
-            errexit(agent_create_error, agent);
+            errexit(AGENT_CREATE_ERROR, agent);
         }
     }
 
@@ -71,7 +78,7 @@ int main() {
         // create thread
         errcode = pthread_create(&cust_threads[customer], NULL, customer_thread, &cust_ids[customer]);
         if(errcode) {
-            errexit(customer_create_error, customer);
+            errexit(CUSTOMER_CREATE_ERROR, customer);
         }
     }
 
@@ -79,7 +86,7 @@ int main() {
     for(int customer = 0; customer < NUM_CUSTOMERS; customer++) {
         errcode = pthread_join(cust_threads[customer], (void **) &status);
         if(errcode || *status != customer) {
-            errexit(customer_join_error, customer);
+            errexit(CUSTOMER_JOIN_ERROR, customer);
         }
         else {
             printf("Customer %d joined\n", customer);
@@ -90,7 +97,7 @@ int main() {
     for(int agent = 0; agent < NUM_AGENTS; agent++) {
         errcode = pthread_join(agent_threads[agent], (void **) &status);
         if(errcode || *status != agent) {
-            errexit(agent_join_error, agent);
+            errexit(AGENT_JOIN_ERROR, agent);
         } 
         else {
             printf("Agent %d joined\n", agent);
@@ -100,7 +107,7 @@ int main() {
     // join the announcer thread
     errcode = pthread_join(announcer, (void **) &status);
     if(errcode || *status != announcer_id) {
-        errexit(announcer_join_error, announcer_id);
+        errexit(ANNOUNCER_JOIN_ERROR, announcer_id);
     }
     else {
         printf("Announcer joined\n");
@@ -109,7 +116,7 @@ int main() {
     // join the info desk thread
     errcode = pthread_join(info_desk, (void **) &status);
     if(errcode || *status != info_desk_id) {
-        errexit(info_desk_join_error, info_desk_id);
+        errexit(INFO_DESK_JOIN_ERROR, info_desk_id);
     }
     else {
         printf("Information desk joined\n");
@@ -120,37 +127,38 @@ int main() {
     return 0;
 }
 
+// prints appropriate error message to the screen and exits the program
 void errexit(int error, int tid) {
     switch(error) {
-        case customer_create_error: {
+        case CUSTOMER_CREATE_ERROR: {
             printf("customer %d failed to be created\n", tid);
             exit(1);
         }
-        case agent_create_error: {
+        case AGENT_CREATE_ERROR: {
             printf("agent %d failed to be created\n", tid);
             exit(1);
         }
-        case info_desk_create_error: {
+        case INFO_DESK_CREATE_ERROR: {
             printf("Information desk failed to be created\n");
             exit(1);
         }
-        case announcer_create_error: {
+        case ANNOUNCER_CREATE_ERROR: {
             printf("Announcer failed to be created");
             exit(1);
         }
-        case customer_join_error: {
+        case CUSTOMER_JOIN_ERROR: {
             printf("customer %d terminated abnormally\n", tid);
             exit(1);
         }
-        case agent_join_error: {
+        case AGENT_JOIN_ERROR: {
             printf("agent %d terminated abnormally\n", tid);
             exit(1);
         }
-        case info_desk_join_error: {
+        case INFO_DESK_JOIN_ERROR: {
             printf("Information desk terminated abnormally");
             exit(1);
         }
-        case announcer_join_error: {
+        case ANNOUNCER_JOIN_ERROR: {
             printf("Announcer terminated abnormally");
             exit(1);
         }
@@ -161,6 +169,7 @@ void errexit(int error, int tid) {
     }
 }
 
+// code for customer thread
 void* customer_thread(void* arg) {
     int tid = *(int *) arg;
     printf("Customer %d created, enters DMV\n", tid);
@@ -169,6 +178,7 @@ void* customer_thread(void* arg) {
     return arg;
 }
 
+// code for agent thread
 void* agent_thread(void* arg) {
     int tid = *(int *) arg;
     printf("Agent %d created\n", tid);
@@ -177,6 +187,7 @@ void* agent_thread(void* arg) {
     return arg;
 }
 
+// code for information desk thread
 void* info_desk_thread(void* arg) {
     int tid = *(int *) arg;
     printf("Information desk created\n");
@@ -185,6 +196,7 @@ void* info_desk_thread(void* arg) {
     return arg;
 }
 
+// code for announcer thread
 void* announcer_thread(void* arg) {
     int tid = *(int *) arg;
     printf("Announcer created\n");

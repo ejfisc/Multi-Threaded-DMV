@@ -42,7 +42,7 @@ int main (int argc, char *argv[])
    if (sem_init (&semaphore, 0, 0) == -1)
    {
       printf("Init semaphore\n");
-      exit(1);
+      //exit(1);
    }
 
    /*
