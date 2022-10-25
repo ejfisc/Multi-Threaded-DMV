@@ -306,6 +306,7 @@ void* announcer_thread(void* arg) {
         sem_wait(waiting_room);
         queue *queue_ptr = &waiting_room_queue;
         customer cust = dequeue(queue_ptr);
+        printf("Announcer calls number %d\n", cust.customer_num);
         sem_post(finished);
         next_customer++;
     }
