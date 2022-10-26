@@ -6,12 +6,12 @@
 #include <sys/types.h>
 #include <semaphore.h>
 
-// number of customers and agents
+// define number of customers and agents
 #define NUM_CUSTOMERS 20
 #define NUM_AGENTS 2
 #define MAX_AGENT_QUEUE 4
 
-// error codes
+// define error codes
 #define CUSTOMER_CREATE_ERROR 0
 #define AGENT_CREATE_ERROR 1
 #define INFO_DESK_CREATE_ERROR 2
@@ -21,9 +21,10 @@
 #define INFO_DESK_JOIN_ERROR 6
 #define ANNOUNCER_JOIN_ERROR 7
 
-// semaphore names
+// define semaphore names
 #define SEM_MUTEX1_NAME "/mutex1"
 #define SEM_MUTEX2_NAME "/mutex2"
+#define SEM_MUTEX3_NAME "/mutex3"
 #define SEM_INFO_DESK_NAME "/info_desk"
 #define SEM_WAITING_ROOM_NAME "/waiting_room"
 #define SEM_FINISHED_NAME "/finished"
@@ -48,6 +49,7 @@ typedef struct Queue {
 // semaphores, set up is in main
 sem_t *mutex1;
 sem_t *mutex2;
+sem_t *mutex3;
 sem_t *info_desk;
 sem_t *waiting_room;
 sem_t *finished;
@@ -58,17 +60,129 @@ sem_t *coordination;
 queue info_desk_queue;
 queue waiting_room_queue;
 queue agent_line_queue;
+queue temp_queue; 
+// queue temp_queue2;
 
 // function declarations
 void thread_error(int, int);
-void* customer_thread(void*);
-void* agent_thread(void*);
-void* info_desk_thread(void*);
-void* announcer_thread(void*);
+// void* customer_thread(void*);
+// void* agent_thread(void*);
+// void* info_desk_thread(void*);
+// void* announcer_thread(void*);
 void enqueue(queue*, customer cust);
 customer dequeue(queue*);
+customer* peek(queue*);
 
-int debugOutput = 0;
+int debugOutput = 1;
+
+/*=================================================================================================================
+THREAD CODE
+=================================================================================================================*/
+
+// code for customer thread
+void* customer_thread(void* arg) {
+    int tid = *(int *) arg;
+    printf("Customer %d created, enters DMV\n", tid);
+
+    // mutex block for inserting itself into queue
+    if(debugOutput) printf("[customer %d] waiting for mutex 1\n", tid);
+    sem_wait(mutex1);
+    if(debugOutput) printf("[customer %d] In mutex block 1\n", tid);
+    customer cust;
+    cust.threadid = tid;
+    queue *queue_ptr = &info_desk_queue;
+    enqueue(queue_ptr, cust);
+    if(debugOutput) printf("[customer %d] info_desk_queue[%d]: customer {threadid: %d}\n", tid, info_desk_queue.last-1, tid);
+    sem_post(mutex1);
+    if(debugOutput) printf("[customer %d] signaled mutex 1\n", tid);
+
+    sem_post(info_desk); // signal info_desk for info desk
+    if(debugOutput) printf("[customer %d] signaled info desk\n", tid);
+
+    if(debugOutput) printf("[customer %d] waiting for coordination\n", tid);
+    sem_wait(coordination); // wait for info desk to give number
+
+    // mutex block for moving to waiting room
+    if(debugOutput) printf("[customer %d] waiting for mutex 2\n", tid);
+    sem_wait(mutex2);
+    if(debugOutput) printf("[customer %d] in mutex block 2\n", tid);
+    cust = dequeue(queue_ptr); // dequeue customer from info desk line
+    queue_ptr = &waiting_room_queue;
+    enqueue(queue_ptr, cust); // enqueue customer to waiting room
+    printf("Customer %d gets %d, enters waiting room\n", cust.threadid, cust.customer_num);
+    sem_post(waiting_room); // signal waiting_room to let announcer know there is a customer in the waiting room
+    if(debugOutput) printf("[customer %d] signaled waiting_room\n", tid);
+    if(debugOutput) printf("[customer %d] waiting_room_queue[%d]: customer {threadid: %d, customer_num: %d}\n", tid, waiting_room_queue.last-1, cust.threadid, cust.customer_num);
+    sem_post(mutex2);
+    if(debugOutput) printf("[customer %d] signaled mutex 2\n", tid);
+
+    // mutex block for moving to agent line
+    if(debugOutput) printf("[customer %d] waiting for mutex 3\n", tid);
+    sem_wait(mutex3);
+    if(debugOutput) printf("[customer %d] in mutex block 3\n", tid);
+    // sem_wait(announced);
+
+    sem_post(mutex3);
+    if(debugOutput) printf("[customer %d] signaled mutex 3\n", tid);
+
+    // sem_wait(finished); // wait for customer to be finished
+    printf("Customer %d is finished and leaves DMV\n", tid);
+    return arg;
+}
+
+// code for information desk thread
+void* info_desk_thread(void* arg) {
+    int next_customer = 0; // used for assigning each customer a unique number
+    printf("Information desk created\n"); 
+    // loop runs until all customers have been assigned a number
+    while(next_customer < 20) {
+        if(debugOutput) printf("[info_desk] waiting for info_desk\n");
+        sem_wait(info_desk); // wait for customer to be in line at info desk
+        queue *queue_ptr = &info_desk_queue;
+        customer *cust = peek(queue_ptr); // peek next customer in info desk line
+        cust->customer_num = next_customer; // assign customer its number
+
+        sem_post(coordination); // signal coordination
+        if(debugOutput) printf("[info_desk] signaled coordination\n");
+        next_customer++;
+    }
+    printf("Information desk is finished\n");
+    return arg;
+}
+
+// code for announcer thread
+void* announcer_thread(void* arg) {
+    int tid = *(int *) arg;
+    int next_customer = 0;
+    printf("Announcer created\n");
+    while(next_customer < 20) {
+        // if(debugOutput) printf("[announcer] waiting for waiting_room\n");
+        // sem_wait(waiting_room); // wait for customer to be in waiting room
+        // if(debugOutput) printf("[announcer] waiting for agent_line\n");
+        // sem_wait(agent_line); // wait for spot to open in agent line
+        // queue *queue_ptr = &waiting_room_queue;
+        // customer *cust = peek(queue_ptr); // peek at next customer in waiting room
+        // printf("Announcer calls number %d\n", cust->customer_num);
+
+        // sem_post(announced);
+        next_customer++;
+    }
+    printf("Announcer is finished\n");
+    return arg;
+}
+
+// code for agent thread
+void* agent_thread(void* arg) {
+    int tid = *(int *) arg;
+    printf("Agent %d created\n", tid);
+    // do something
+    printf("Agent %d is finished\n", tid);
+    return arg;
+}
+
+/*=================================================================================================================
+MAIN
+=================================================================================================================*/
 
 // main thread is used for creating and joining the other threads
 int main() {
@@ -88,6 +202,16 @@ int main() {
     agent_line_queue.next = 0;
     agent_line_queue.queue = (customer*)malloc(sizeof(customer)*MAX_AGENT_QUEUE);
 
+    temp_queue.size = NUM_CUSTOMERS;
+    temp_queue.last = 0;
+    temp_queue.next = 0;
+    temp_queue.queue = (customer*)malloc(sizeof(customer)*NUM_CUSTOMERS);
+
+    // temp_queue2.size = NUM_CUSTOMERS;
+    // temp_queue2.last = 0;
+    // temp_queue2.next = 0;
+    // temp_queue2.queue = (customer*)malloc(sizeof(customer)*NUM_CUSTOMERS);
+
     // set up semaphores
     sem_unlink(SEM_MUTEX1_NAME); // remove the semaphore if for some reason it still exists
     mutex1 = sem_open(SEM_MUTEX1_NAME, O_CREAT, 0664, 1); // open the semaphore
@@ -95,40 +219,53 @@ int main() {
        printf("mutex1 semaphore failed to open");
        exit(1);
     }
+
     sem_unlink(SEM_INFO_DESK_NAME);
     info_desk = sem_open(SEM_INFO_DESK_NAME, O_CREAT, 0664, 0);
     if(info_desk == SEM_FAILED) {
         printf("info_desk semaphore failed to open");
         exit(1);
     }
+
     sem_unlink(SEM_FINISHED_NAME);
     finished = sem_open(SEM_FINISHED_NAME, O_CREAT, 0664, 0);
     if(finished == SEM_FAILED) {
         printf("finished semaphore failed to open");
         exit(1);
     }
+
     sem_unlink(SEM_WAITING_ROOM_NAME);
     waiting_room = sem_open(SEM_WAITING_ROOM_NAME, O_CREAT, 0664, 0);
     if(waiting_room == SEM_FAILED) {
         printf("waiting_room semaphore failed to open");
         exit(1);
     }
+
     sem_unlink(SEM_AGENT_LINE_NAME);
     agent_line = sem_open(SEM_AGENT_LINE_NAME, O_CREAT, 0664, 4);
     if(agent_line == SEM_FAILED) {
         printf("agent_line semaphore failed to open");
         exit(1);
     }
+
     sem_unlink(SEM_MUTEX2_NAME);
-    mutex2 = sem_open(SEM_MUTEX2_NAME, O_CREAT, 0664, 0);
+    mutex2 = sem_open(SEM_MUTEX2_NAME, O_CREAT, 0664, 1);
     if(mutex2 == SEM_FAILED) {
        printf("mutex2 semaphore failed to open");
        exit(1);
     }
+
     sem_unlink(SEM_COORDINATION_NAME);
     coordination = sem_open(SEM_COORDINATION_NAME, O_CREAT, 0664, 0);
     if(coordination == SEM_FAILED) {
         printf("coordination semaphore failed to open");
+        exit(1);
+    }
+
+    sem_unlink(SEM_MUTEX3_NAME);
+    mutex3 = sem_open(SEM_MUTEX3_NAME, O_CREAT, 0664, 1);
+    if(mutex3 == SEM_FAILED) {
+        printf("mutex3 semaphore failed to open");
         exit(1);
     }
 
@@ -225,86 +362,9 @@ int main() {
 }
 
 
-// code for customer thread
-void* customer_thread(void* arg) {
-    int tid = *(int *) arg;
-    printf("Customer %d created, enters DMV\n", tid);
-
-    // mutex block for inserting itself into queue
-    sem_wait(mutex1);
-    customer cust;
-    cust.threadid = tid;
-    queue *queue_ptr = &info_desk_queue;
-    enqueue(queue_ptr, cust);
-    if(debugOutput) printf("[customer %d] info_desk_queue[%d]: customer {threadid: %d}\n", tid, info_desk_queue.last-1, tid);
-    sem_post(mutex1);
-
-    sem_post(info_desk); // signal info_desk for info desk
-    
-    
-    sem_wait(coordination); // wait for info desk to give number
-
-    queue_ptr = &waiting_room_queue;
-    enqueue(queue_ptr, cust); // enqueue customer to waiting room
-    sem_post(waiting_room);
-    if(debugOutput) printf("[info desk] waiting_room_queue[%d]: customer {threadid: %d, customer_num: %d}\n", waiting_room_queue.last-1, cust.threadid, cust.customer_num);
-
-    sem_wait(finished); // wait for customer to be finished
-    printf("Customer %d is finished and leaves DMV\n", tid);
-    return arg;
-}
-
-// code for agent thread
-void* agent_thread(void* arg) {
-    int tid = *(int *) arg;
-    printf("Agent %d created\n", tid);
-    // do something
-    printf("Agent %d is finished\n", tid);
-    return arg;
-}
-
-// code for information desk thread
-void* info_desk_thread(void* arg) {
-    int curr = 0; // used for assigning each customer a unique number
-    printf("Information desk created\n"); 
-    // loop runs until all customers have been assigned a number
-    while(curr < 20) {
-        sem_wait(info_desk);
-        queue *queue_ptr = &info_desk_queue;
-        customer cust = dequeue(queue_ptr); // dequeue customer from info desk line
-        cust.customer_num = curr; // assign customer its number
-
-        
-
-        printf("Customer %d gets %d, enters waiting room\n", cust.threadid, cust.customer_num);
-        // queue_ptr = &waiting_room_queue;
-        // enqueue(queue_ptr, cust); // enqueue customer to waiting room
-        // sem_post(waiting_room);
-        // if(debugOutput) printf("[info desk] waiting_room_queue[%d]: customer {threadid: %d, customer_num: %d}\n", waiting_room_queue.last-1, cust.threadid, cust.customer_num);
-        sem_post(coordination);
-        curr++;
-    }
-    printf("Information desk is finished\n");
-    return arg;
-}
-
-// code for announcer thread
-void* announcer_thread(void* arg) {
-    int tid = *(int *) arg;
-    int next_customer = 0;
-    printf("Announcer created\n");
-    while(next_customer < 20) {
-        sem_wait(waiting_room);
-
-        queue *queue_ptr = &waiting_room_queue;
-        customer cust = dequeue(queue_ptr);
-        printf("Announcer calls number %d\n", cust.customer_num);
-        sem_post(finished);
-        next_customer++;
-    }
-    printf("Announcer is finished\n");
-    return arg;
-}
+/*=================================================================================================================
+HELPER METHODS
+=================================================================================================================*/
 
 // prints appropriate error message to the screen and exits the program
 void thread_error(int error, int tid) {
@@ -363,3 +423,10 @@ customer dequeue(queue *queue) {
     return ret;
 }
 
+// return a pointer to the next customer in line without removing them from the queue
+customer* peek(queue *queue) {
+    customer cust = queue->queue[queue->next];
+    if(debugOutput) printf("[peek] Next customer in line is {threadid: %d}\n", cust.threadid); // don't want to print customer_num because it might still be undefined
+    customer *cust_ptr = &cust;
+    return cust_ptr;
+}
