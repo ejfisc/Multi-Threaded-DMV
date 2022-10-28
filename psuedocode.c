@@ -4,8 +4,14 @@ semaphore cust_ready = 0;
 semaphore agent_line = 4;
 semaphore info_desk, announcer = 1;
 semaphore mutex1 = 1;
+semaphore coord = 2;
+semaphore customer_in_agent_line = 0;
+semaphore customer_in_info_desk_line = 0;
+semaphore customer_in_waiting_room = 0;
 semaphore finished[20] = {0};
-int count = 0;
+semaphore number_assigned[20] = {0};
+
+queue info_desk_line;
 
 int main() {
     createAgents();
@@ -14,44 +20,84 @@ int main() {
     createCustomers();
 }
 
-void customer() {
-    int cust = 0; // customer number (initialized to 0)
-    enterDMV(); // customer first enters the DMV
-    wait(mutex1); // mutex so customer number is accurate
-    count++;
-    cust = count;
-    signal(mutex1); // signal mutex 1 so next customer can be given correct customer number
-    signal(cust_ready); // signal customer ready for the info desk
-    wait(info_desk); // wait for the info desk
-    takeNumber(); // take number from info desk
-    signal(info_desk); // signal info desk for next customer
-    goToWaitingArea(); // go to waiting area
-    wait(announcer); // wait for announcer to call number
-    goToAgentLine(); // go to agent line
-    signal(announcer); // signal announcer for next customer
-    wait(finished[cust]); // wait for customer to be finished with agent
-    signal(agent_line); // signal agent line for next customer
-    leaveDMV(); // customer leaves DMV
+void customer(arg) {
+    int tid = arg;
+    // customer gets created, enters DMV
+    customer.thread_id = tid;
+
+    // mutex to enter queue for info desk
+    wait(mutex1);
+    
+    enqueue(info_desk_line);
+    signal(mutex1);
+
+    signal(customer_in_info_desk_line); // signal to info desk that a customer is in line
+    wait(number_assigned[tid]);
+
+
+
+    wait()
+
+
+
+    wait(finished[thread_id]);
+    // leave DMV
 }
 
-void infoDesk() {
+void infoDesk(arg) {
+    int customer_number = 1;
     while(true) {
-        wait(cust_ready); // waits for customer to be ready/in line for number
-        assignNumber(); // assign customer number
-        signal(info_desk); // signal info desk for next customer
+        wait(customer_in_info_desk_line);
+
+        // assign the customer a number
+        wait(mutex2);
+        customer = dequeue(info_desk_line);
+        customer.customer_num = customer_number;
+        signal(mutex2);
+
+        signal(number_assigned[customer.thread_id]); // signal that the customer has been given a number
     }
 }
 
-void announcer() {
+void announcer(arg) {
     while(true) {
-        wait(agent_line); // wait for spot to open in agent line
-        announce(); // send customer to agent line
-        signal(announcer); // signal announcer 
+        wait(customer_in_waiting_room);
     }
 }
 
 void agent() {
     while(true) {
-        
+        wait(customer_in_agent_line);
+        wait(coord);
+        signal()
+        signal(coord);
     }
 }
+
+/*
+order of output:
+
+announcer, info desk, and agents get created
+
+customer 0 gets created, enters DMV
+
+customer 0 gets number 1, enters waiting room
+
+announcer calls number 1
+
+customer 0 moves to agent line 
+
+agent 0 is serving customer 0
+
+customer 0 is being served by agent 0
+
+agent 0 asks customer 0 to take photo and eye exam 
+
+customer 0 completes photo and eye exam for agent 0
+
+agent 0 gives license to customer 0
+
+customer 0 gets license and departs
+
+customer 0 was joined
+*/
