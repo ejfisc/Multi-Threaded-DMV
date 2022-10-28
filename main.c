@@ -72,7 +72,7 @@ void enqueue(queue*, customer *cust);
 customer* dequeue(queue*);
 customer* peek(queue*);
 
-int debugOutput = 0;
+int debugOutput = 1;
 
 /*=================================================================================================================
 THREAD CODE
@@ -88,11 +88,9 @@ void* customer_thread(void* arg) {
     sem_wait(mutex1);
 
     if(debugOutput) printf("[customer %d] In mutex block 1\n", tid);
-    customer *cust;
-    cust->threadid = tid;
-    cust->customer_num = -1;
-    enqueue(&info_desk_queue, cust); // enqueue customer into info desk line
-    if(debugOutput) printf("[customer %d] info_desk_queue[%d]: customer {threadid: %d, customer_num: %d}\n", tid, info_desk_queue.last-1, tid, cust->customer_num);
+    customer cust = {.threadid = tid, .customer_num = -1};
+    enqueue(&info_desk_queue, &cust); // enqueue customer into info desk line
+    if(debugOutput) printf("[customer %d] info_desk_queue[%d]: customer {threadid: %d, customer_num: %d}\n", tid, info_desk_queue.last-1, tid, cust.customer_num);
     
     sem_post(customer_ready_at_info_desk); // signal for info desk
     if(debugOutput) printf("[customer %d] signaled info desk\n", tid);
@@ -103,7 +101,7 @@ void* customer_thread(void* arg) {
     if(debugOutput) printf("[customer %d] waiting for coordination\n", tid);
     sem_wait(number_assigned[tid]); // wait for info desk to give number
 
-    printf("Customer %d gets number %d, enters waiting room\n", cust->threadid, cust->customer_num);
+    printf("Customer %d gets number %d, enters waiting room\n", cust.threadid, cust.customer_num);
 
     // mutex block for moving to waiting room
     if(debugOutput) printf("[customer %d] waiting for mutex 2\n", tid);
@@ -111,15 +109,15 @@ void* customer_thread(void* arg) {
 
     if(debugOutput) printf("[customer %d] in mutex block 2\n", tid);
 
-    cust = dequeue(&info_desk_queue); // dequeue customer from info desk line
-    if(debugOutput) printf("[customer %d] dequeued from info desk queue with number %d\n", cust->threadid, cust->customer_num);
-    enqueue(&waiting_room_queue, cust); // enqueue customer to waiting room
-    if(debugOutput) printf("[customer %d] enqueued in waiting room\n", cust->threadid);
+    cust = *dequeue(&info_desk_queue); // dequeue customer from info desk line
+    if(debugOutput) printf("[customer %d] dequeued from info desk queue with number %d\n", cust.threadid, cust.customer_num);
+    enqueue(&waiting_room_queue, &cust); // enqueue customer to waiting room
+    if(debugOutput) printf("[customer %d] enqueued in waiting room\n", cust.threadid);
 
-    printf("Customer %d gets %d, enters waiting room\n", cust->threadid, cust->customer_num);
+    printf("Customer %d gets %d, enters waiting room\n", cust.threadid, cust.customer_num);
     sem_post(customer_in_waiting_room); // signal waiting_room to let announcer know there is a customer in the waiting room
     if(debugOutput) printf("[customer %d] signaled waiting_room\n", tid);
-    if(debugOutput) printf("[customer %d] waiting_room_queue[%d]: customer {threadid: %d, customer_num: %d}\n", tid, waiting_room_queue.last-1, cust->threadid, cust->customer_num);
+    if(debugOutput) printf("[customer %d] waiting_room_queue[%d]: customer {threadid: %d, customer_num: %d}\n", tid, waiting_room_queue.last-1, cust.threadid, cust.customer_num);
     
     sem_post(mutex2); // signal mutex 2 so next customer can enter this block
     if(debugOutput) printf("[customer %d] signaled mutex 2\n", tid);
@@ -136,15 +134,17 @@ void* info_desk_thread(void* arg) {
     int next_customer = 0; // used for assigning each customer a unique number
     printf("Information desk created\n"); 
     // loop runs until all customers have been assigned a number
-    while(next_customer < 20) {
+    while(next_customer < NUM_CUSTOMERS) {
 
         if(debugOutput) printf("[info_desk] waiting for info_desk\n");
         sem_wait(customer_ready_at_info_desk); // wait for customer to be in line at info desk
 
-        customer *cust = peek(&info_desk_queue); // peek next customer in info desk line
-        cust->customer_num = next_customer; // assign customer its number
+        customer cust = info_desk_queue.queue[info_desk_queue.next];
+        info_desk_queue.queue[info_desk_queue.next].customer_num = next_customer;
+        // customer *cust = peek(&info_desk_queue); // peek next customer in info desk line
+        // cust->customer_num = next_customer; // assign customer its number
 
-        sem_post(number_assigned[cust->threadid]); // signal coordination
+        sem_post(number_assigned[cust.threadid]); // signal coordination
         if(debugOutput) printf("[info_desk] signaled coordination\n");
 
         next_customer++;
@@ -158,7 +158,7 @@ void* announcer_thread(void* arg) {
     int tid = *(int *) arg;
     int next_customer = 0;
     printf("Announcer created\n");
-    while(next_customer < 20) {
+    while(next_customer < NUM_CUSTOMERS) {
         
         next_customer++;
     }
