@@ -69,7 +69,7 @@ queue agent_line_queue;
 // function declarations
 void thread_error(int, int);
 void enqueue(queue*, customer *cust);
-customer dequeue(queue*);
+customer* dequeue(queue*);
 customer* peek(queue*);
 
 int debugOutput = 0;
@@ -90,9 +90,9 @@ void* customer_thread(void* arg) {
     if(debugOutput) printf("[customer %d] In mutex block 1\n", tid);
     customer *cust;
     cust->threadid = tid;
-    queue *queue_ptr = &info_desk_queue;
-    enqueue(queue_ptr, cust); // enqueue customer into info desk line
-    if(debugOutput) printf("[customer %d] info_desk_queue[%d]: customer {threadid: %d}\n", tid, info_desk_queue.last-1, tid);
+    cust->customer_num = -1;
+    enqueue(&info_desk_queue, cust); // enqueue customer into info desk line
+    if(debugOutput) printf("[customer %d] info_desk_queue[%d]: customer {threadid: %d, customer_num: %d}\n", tid, info_desk_queue.last-1, tid, cust->customer_num);
     
     sem_post(customer_ready_at_info_desk); // signal for info desk
     if(debugOutput) printf("[customer %d] signaled info desk\n", tid);
@@ -103,18 +103,23 @@ void* customer_thread(void* arg) {
     if(debugOutput) printf("[customer %d] waiting for coordination\n", tid);
     sem_wait(number_assigned[tid]); // wait for info desk to give number
 
+    printf("Customer %d gets number %d, enters waiting room\n", cust->threadid, cust->customer_num);
+
     // mutex block for moving to waiting room
     if(debugOutput) printf("[customer %d] waiting for mutex 2\n", tid);
     sem_wait(mutex2);
 
     if(debugOutput) printf("[customer %d] in mutex block 2\n", tid);
-    cust = dequeue(queue_ptr); // dequeue customer from info desk line
-    queue_ptr = &waiting_room_queue;
-    enqueue(queue_ptr, cust); // enqueue customer to waiting room
-    printf("Customer %d gets %d, enters waiting room\n", cust.threadid, cust.customer_num);
-    sem_post(waiting_room); // signal waiting_room to let announcer know there is a customer in the waiting room
+
+    cust = dequeue(&info_desk_queue); // dequeue customer from info desk line
+    if(debugOutput) printf("[customer %d] dequeued from info desk queue with number %d\n", cust->threadid, cust->customer_num);
+    enqueue(&waiting_room_queue, cust); // enqueue customer to waiting room
+    if(debugOutput) printf("[customer %d] enqueued in waiting room\n", cust->threadid);
+
+    printf("Customer %d gets %d, enters waiting room\n", cust->threadid, cust->customer_num);
+    sem_post(customer_in_waiting_room); // signal waiting_room to let announcer know there is a customer in the waiting room
     if(debugOutput) printf("[customer %d] signaled waiting_room\n", tid);
-    if(debugOutput) printf("[customer %d] waiting_room_queue[%d]: customer {threadid: %d, customer_num: %d}\n", tid, waiting_room_queue.last-1, cust.threadid, cust.customer_num);
+    if(debugOutput) printf("[customer %d] waiting_room_queue[%d]: customer {threadid: %d, customer_num: %d}\n", tid, waiting_room_queue.last-1, cust->threadid, cust->customer_num);
     
     sem_post(mutex2); // signal mutex 2 so next customer can enter this block
     if(debugOutput) printf("[customer %d] signaled mutex 2\n", tid);
@@ -136,8 +141,7 @@ void* info_desk_thread(void* arg) {
         if(debugOutput) printf("[info_desk] waiting for info_desk\n");
         sem_wait(customer_ready_at_info_desk); // wait for customer to be in line at info desk
 
-        queue *queue_ptr = &info_desk_queue;
-        customer *cust = peek(queue_ptr); // peek next customer in info desk line
+        customer *cust = peek(&info_desk_queue); // peek next customer in info desk line
         cust->customer_num = next_customer; // assign customer its number
 
         sem_post(number_assigned[cust->threadid]); // signal coordination
@@ -155,15 +159,7 @@ void* announcer_thread(void* arg) {
     int next_customer = 0;
     printf("Announcer created\n");
     while(next_customer < 20) {
-        // if(debugOutput) printf("[announcer] waiting for waiting_room\n");
-        // sem_wait(waiting_room); // wait for customer to be in waiting room
-        // if(debugOutput) printf("[announcer] waiting for agent_line\n");
-        // sem_wait(agent_line); // wait for spot to open in agent line
-        // queue *queue_ptr = &waiting_room_queue;
-        // customer *cust = peek(queue_ptr); // peek at next customer in waiting room
-        // printf("Announcer calls number %d\n", cust->customer_num);
-
-        // sem_post(announced);
+        
         next_customer++;
     }
     printf("Announcer is finished\n");
@@ -417,24 +413,25 @@ void thread_error(int error, int tid) {
 }
 
 // enqueues the given customer to the last position in the given queue
-void enqueue(queue *queue, customer cust) {
-    queue->queue[queue->last] = cust;
-    if(debugOutput) printf("[enqueue] Placing customer {threadid: %d, customer_num: %d} at place %d in the queue\n", cust.threadid, cust.customer_num, queue->last);
+void enqueue(queue *queue, customer *cust) {
+    queue->queue[queue->last] = *cust;
+    if(debugOutput) printf("[enqueue] Placing customer {threadid: %d, customer_num: %d} at place %d in the queue\n", cust->threadid, cust->customer_num, queue->last);
     queue->last++;
 }
 
 // dequeues the next customer from the given customer queue
-customer dequeue(queue *queue) {
-    customer ret = queue->queue[queue->next];
+customer* dequeue(queue *queue) {
+    customer cust = queue->queue[queue->next];
     queue->next++;
-    if(debugOutput) printf("[dequeue] Removing customer {threadid: %d, customer_num: %d} from the queue, next: %d\n", ret.threadid, ret.customer_num, queue->next);
-    return ret;
+    if(debugOutput) printf("[dequeue] Removing customer {threadid: %d, customer_num: %d} from the queue, next: %d\n", cust.threadid, cust.customer_num, queue->next);
+    customer *cust_ptr = &cust;
+    return cust_ptr;
 }
 
 // return a pointer to the next customer in line without removing them from the queue
 customer* peek(queue *queue) {
     customer cust = queue->queue[queue->next];
-    if(debugOutput) printf("[peek] Next customer in line is {threadid: %d}\n", cust.threadid); // don't want to print customer_num because it might still be undefined
+    if(debugOutput) printf("[peek] Next customer in line is {threadid: %d, customer_num: %d}\n", cust.threadid, cust.customer_num); 
     customer *cust_ptr = &cust;
     return cust_ptr;
 }
