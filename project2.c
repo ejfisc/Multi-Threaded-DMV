@@ -50,10 +50,9 @@ typedef struct Customer {
 
 // queue struct, used to queue the customers in line for information desk, waiting room, and agent line
 typedef struct myQueue {
-    int max_size; // max_size of queue
     int next_index; // index of next_index customer in line, incremented when a customer is dequeued
     int last_index; // index of last_index customer in line, incremented when a customer is enqueued
-    customer* queuePtr; // customer pointer, to be initialized as an array according to max_size
+    customer* queuePtr; // customer pointer, to be initialized as an array according to NUM_CUSTOMERS
 }my_queue;
 
 // semaphores, set up is in main
@@ -246,17 +245,14 @@ MAIN
 // main thread is used for creating and joining the other threads
 int main() {
     // initialize queues
-    info_desk_queue.max_size = NUM_CUSTOMERS;
     info_desk_queue.last_index = 0;
     info_desk_queue.next_index = 0;
     info_desk_queue.queuePtr = (customer*)malloc(sizeof(customer)*NUM_CUSTOMERS);
     
-    waiting_room_queue.max_size = NUM_CUSTOMERS;
     waiting_room_queue.last_index = 0;
     waiting_room_queue.next_index = 0;
     waiting_room_queue.queuePtr = (customer*)malloc(sizeof(customer)*NUM_CUSTOMERS);
 
-    agent_line_queue.max_size = NUM_CUSTOMERS;
     agent_line_queue.last_index = 0;
     agent_line_queue.next_index = 0;
     agent_line_queue.queuePtr = (customer*)malloc(sizeof(customer)*NUM_CUSTOMERS);
