@@ -5,11 +5,12 @@
 #include <string.h>
 #include <sys/types.h>
 #include <semaphore.h>
+#include <fcntl.h>
 
 // define number of customers and agents
-const int NUM_CUSTOMERS = 20;
-const int NUM_AGENTS = 2;
-const int MAX_AGENT_QUEUE = 4;
+#define NUM_CUSTOMERS 20
+#define NUM_AGENTS 2
+#define MAX_AGENT_QUEUE 4
 
 // define error codes
 #define CUSTOMER_CREATE_ERROR 0
